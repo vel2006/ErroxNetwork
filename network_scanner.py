@@ -66,10 +66,6 @@ class ErroxNetwork():
             if response.status_code != 200:
                 return ErroxNetworkError(f"Response from page \'http://{self.DEFAULT_GATEWAY}{wanted_webpage}\' returned with status code of: \'{response.status_code}\' not 200")
             return response.content
-    def get_network_broadcast(self):
-        """
-            
-        """
     def get_gateway_webpages(self):
         """
             \'get_gatway_webpages\' returns a dictionary of all known pages on an american made wifi router.
