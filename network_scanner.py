@@ -14,6 +14,7 @@ class ErroxNetwork():
         self.NETWORK_OCTECTS = ""
         self.HOST_OCTECTS = ""
         self.BROADCAST_ADDRESS = ""
+        self.NETWORK_OBJECT = ""
         self.WIFI_ROUTER_PAGES = {
             'AT&T': {
                 'DevicePages': ["/cgi-bin/home.ha", "/cgi-bin/devices.ha", "/cgi-bin/sysinfo.ha", "/cgi-bin/routerpasswd.ha", "/cgi-bin/remoteaccess.ha", "/cgi-bin/restart.ha"],
@@ -54,21 +55,45 @@ class ErroxNetwork():
             If the \'ErroxNetwork\' object\'s default gateway and subnet mask are not set (set via called methods) it will raise an error.
         """
         if self.DEFAULT_GATEWAY != "" and self.SUBNETMASK != "":
-            self.NETWORK_ADDRESS = str(ipaddress.IPv4Network(f"{self.DEFAULT_GATEWAY}/{self.SUBNETMASK}", strict=False))
+            self.NETWORK_OBJECT = ipaddress.IPv4Network(f"{self.DEFAULT_GATEWAY}/{self.SUBNETMASK}", strict=False)
+            self.NETWORK_ADDRESS = str(self.NETWORK_OBJECT)
         else:
             raise ErroxNetworkError("\'self.DEFUALT_GATEWAY\' and/or \'self.SUBNETMASK\' is not set!")
         return self.NETWORK_ADDRESS
-    def get_gateway_webpage(self, wanted_webpage:str):
+    def get_gateway_webpage(self, router_company:str, wanted_webpage:str):
+        """
+            \'get_gateway_webpage\' attempts to request a webpage from the router.
+            If the wanted webpage is not inside of the known pages dictionary an error will be raised.
+            If the \'ErroxNetwork\' object\'s default gateway is not set (set via called methods) it will raise an error.
+
+            Below is a discription of all the arguments:
+
+                \'router_company\':str is a variable that is to refrence the keys / companies inside of the known pages dictionary
+                \'wanted_webpage\':str is a variable that is to refrence the values / pages inside of the known pages dictionary for the company
+        """
         if self.DEFAULT_GATEWAY == "":
             raise ErroxNetworkError("\'self.DEFAULT_GATWAY\' is not set!")
+        elif router_company not in self.WIFI_ROUTER_PAGES.keys():
+            raise ErroxNetworkError(f"\'{router_company}\' is not in \'self.WIFI_ROUTER_PAGES\'!")
+        elif wanted_webpage not in self.WIFI_ROUTER_PAGES[router_company]:
+            raise ErroxNetworkError(f"\'{wanted_webpage}\' is not in \'self.WIFI_ROUTER_PAGES[{router_company}]\'!")
         else:
             response = requests.get(f"http://{self.DEFAULT_GATEWAY}{wanted_webpage}")
             if response.status_code != 200:
                 return ErroxNetworkError(f"Response from page \'http://{self.DEFAULT_GATEWAY}{wanted_webpage}\' returned with status code of: \'{response.status_code}\' not 200")
             return response.content
+    def get_network_broadcast(self):
+        """
+            \'get_network_broadcast\' returns a string for the network broadcast address.
+            If the \'ErroxNetwork\' object\'s network object is not set (set via called methods) it will raise an error.
+        """
+        if self.NETWORK_OBJECT != "":
+            self.BROADCAST_ADDRESS = str(self.NETWORK_OBJECT.broadcast_address)
+            return self.BROADCAST_ADDRESS
+        raise ErroxNetworkError("\'self.NETWORK_OBJECT\' is not set!")
     def get_gateway_webpages(self):
         """
-            \'get_gatway_webpages\' returns a dictionary of all known pages on an american made wifi router.
+            \'get_gatway_webpages\' returns a dictionary of all known pages on an american made wifi router or added pages and routers.
         """
         return self.WIFI_ROUTER_PAGES
     def get_company_gateway_webpages(self, company:str):
@@ -138,18 +163,38 @@ class ErroxNetwork():
                 unanswered_pings += 1
         return tuple([answered_pings, unanswered_pings])
     def arp_scan_network(self):
-        responded_devices = []
-        answered, unanswered = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=self.NETWORK_ADDRESS), timeout=5)
-        for sent, recieved in answered:
-            print(f"{sent.psrc} | {self.find_ip_from_mac(str(recieved.hwsrc))}")
-        return answered
-    def find_mac_from_ip(self, target_ip):
+        """
+            \'arp_scan_network\' will attempt to scan the current network for any devices that will respond to ARP requests and will return a list of mac addresses that responded.
+            If the \'ErroxNetwork\' object\'s network address is not set (set via calling methods) an error will be raised.
+        """
+        if self.NETWORK_ADDRESS != "":
+            responded_devices = []
+            answered, unanswered = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=self.NETWORK_ADDRESS), timeout=5)
+            for sent, recieved in answered:
+                print(f"{sent.psrc} | {self.find_ip_from_mac(str(recieved.hwsrc))}")
+                responded_devices.append(str(recieved.hwsrc))
+            return answered
+        else:
+            raise ErroxNetworkError("\'self.NETWORK_ADDRESS\' is not set!")
+    def find_mac_from_ip(self, target_ip:str):
+        """
+            \'find_mac_from_ip\' attempts to find the MAC address of an IP address via ARP.
+            Below is a discription of it\'s arguments:
+
+                \'target_ip\':str is the IPv4 address you wish to find the MAC address of.
+        """
         answered, unanswered = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=target_ip), timeout=5)
         if answered:
             return answered[0][1].hwsrc
         else:
             return ErroxNetworkError("Did not get an ARP response from network.")
-    def find_ip_from_mac(self, target_mac):
+    def find_ip_from_mac(self, target_mac:str):
+        """
+            \'find_ip_from_mac\' attempts to find the IP address of a MAC address via ARP.
+            Below is a discription of it\'s arguments:
+
+                \'target_mac\':str is the MAC address you wish to find the IPv4 address of.
+        """
         if self.NETWORK_ADDRESS != "":
             answered, unanswered = srp(Ether(dst=target_mac)/ARP(pdst=self.NETWORK_ADDRESS), timeout=2)
         else:
