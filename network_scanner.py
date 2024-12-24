@@ -31,7 +31,7 @@ class ErroxNetwork():
                 'Local': [],
                 'Config': [],
                 'Themes': [],
-                'Modules': ["/modules/login/controllers.js?t=1aac7043"]
+                'Modules': ["/modules/login/controllers.js"]
             }
         }
         conf.verb = 0
