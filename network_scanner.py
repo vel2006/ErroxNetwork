@@ -24,7 +24,15 @@ class ErroxNetwork():
                 'FirewallPages': ["/cgi-bin/firewall.ha", "/cgi-bin/packetfilter.ha", "/cgi-bin/apphosting.ha", "/cgi-bin/pshosts.ha", "/cgi-bin/ippass.ha", "/cgi-bin/dosprotect.ha",  "/cgi-bin/securityoptions.ha"],
                 'DiagnosticPages': ["/cgi-bin/diag.ha", "/cgi-bin/speed.ha", "/cgi-bin/logs.ha", "/cgi-bin/update.ha", "/cgi-bin/reset.ha", "/cgi-bin/syslog.ha", "/cgi-bin/events.ha", "/cgi-bin/nattable.ha"],
                 'Unknown': ['/cgi-bin/sitemap.ha']
-                }
+                },
+            'TP-Link': {
+                'Javascript': ["/js/libs/jquery.min.js", "/js/libs/cryptoJS.min.js", "/js/libs/tpEncrypt.min.js", "/js/app/url.js"],
+                'CSS': [],
+                'Local': [],
+                'Config': [],
+                'Themes': [],
+                'Modules': ["/modules/login/controllers.js?t=1aac7043"]
+            }
         }
         conf.verb = 0
     def get_default_gateway(self):
@@ -60,7 +68,7 @@ class ErroxNetwork():
         else:
             raise ErroxNetworkError("\'self.DEFUALT_GATEWAY\' and/or \'self.SUBNETMASK\' is not set!")
         return self.NETWORK_ADDRESS
-    def get_gateway_webpage(self, router_company:str, wanted_webpage:str):
+    def get_gateway_webpage(self, router_company:str, page_catagory:str, wanted_webpage:str):
         """
             \'get_gateway_webpage\' attempts to request a webpage from the router.
             If the wanted webpage is not inside of the known pages dictionary an error will be raised.
@@ -69,18 +77,45 @@ class ErroxNetwork():
             Below is a discription of all the arguments:
 
                 \'router_company\':str is a variable that is to refrence the keys / companies inside of the known pages dictionary
+                \'page_gatagory\':str is a variable that is to refrence the catagory that the webpage is inside of in the known pages dictionary
                 \'wanted_webpage\':str is a variable that is to refrence the values / pages inside of the known pages dictionary for the company
         """
         if self.DEFAULT_GATEWAY == "":
             raise ErroxNetworkError("\'self.DEFAULT_GATWAY\' is not set!")
         elif router_company not in self.WIFI_ROUTER_PAGES.keys():
             raise ErroxNetworkError(f"\'{router_company}\' is not in \'self.WIFI_ROUTER_PAGES\'!")
-        elif wanted_webpage not in self.WIFI_ROUTER_PAGES[router_company]:
+        elif page_catagory not in self.WIFI_ROUTER_PAGES[router_company].keys():
+            raise ErroxNetworkError(f"\'{page_catagory}\' is not in \'self.WIFI_ROUTER_PAGES.keys()\'!")
+        elif wanted_webpage not in self.WIFI_ROUTER_PAGES[router_company][page_catagory]:
             raise ErroxNetworkError(f"\'{wanted_webpage}\' is not in \'self.WIFI_ROUTER_PAGES[{router_company}]\'!")
         else:
             response = requests.get(f"http://{self.DEFAULT_GATEWAY}{wanted_webpage}")
             if response.status_code != 200:
                 return ErroxNetworkError(f"Response from page \'http://{self.DEFAULT_GATEWAY}{wanted_webpage}\' returned with status code of: \'{response.status_code}\' not 200")
+            return response.content
+    def get_router_webpage(self, target_ip:str, router_company:str, page_catagory:str, wanted_webpage:str):
+        """
+            \'get_gateway_webpage\' attempts to request a webpage from the router ip address provided.
+            If the wanted webpage is not inside of the known pages dictionary an error will be raised.
+
+            Below is a discription of all the arguments:
+
+                \'router_company\':str is a variable that is to refrence the keys / companies inside of the known pages dictionary
+                \'page_gatagory\':str is a variable that is to refrence the catagory that the webpage is inside of in the known pages dictionary
+                \'wanted_webpage\':str is a variable that is to refrence the values / pages inside of the known pages dictionary for the company
+        """
+        if target_ip is None:
+            raise ErroxNetworkError("\'target_ip\' cannot be None!")
+        elif router_company not in self.WIFI_ROUTER_PAGES.keys():
+            raise ErroxNetworkError(f"\'{router_company}\' is not in \'self.WIFI_ROUTER_PAGES\'!")
+        elif page_catagory not in self.WIFI_ROUTER_PAGES[router_company].keys():
+            raise ErroxNetworkError(f"\'{page_catagory}\' is not in \'self.WIFI_ROUTER_PAGES.keys()\'!")
+        elif wanted_webpage not in self.WIFI_ROUTER_PAGES[router_company][page_catagory]:
+            raise ErroxNetworkError(f"\'{wanted_webpage}\' is not in \'self.WIFI_ROUTER_PAGES[{router_company}]\'!")
+        else:
+            response = requests.get(f"http://{target_ip}{wanted_webpage}")
+            if response.status_code != 200:
+                return ErroxNetworkError(f"Response from page \'http://{target_ip}{wanted_webpage}\' returned with status code of: \'{response.status_code}\' not 200")
             return response.content
     def get_network_broadcast(self):
         """
@@ -171,9 +206,8 @@ class ErroxNetwork():
             responded_devices = []
             answered, unanswered = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=self.NETWORK_ADDRESS), timeout=5)
             for sent, recieved in answered:
-                print(f"{sent.psrc} | {self.find_ip_from_mac(str(recieved.hwsrc))}")
                 responded_devices.append(str(recieved.hwsrc))
-            return answered
+            return responded_devices
         else:
             raise ErroxNetworkError("\'self.NETWORK_ADDRESS\' is not set!")
     def find_mac_from_ip(self, target_ip:str):
